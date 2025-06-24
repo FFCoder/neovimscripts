@@ -102,7 +102,8 @@ vim.g.have_nerd_font = true
 vim.opt.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.opt.relativenumber = true
+vim.opt.relativenumber = true
+vim.opt.signcolumn = 'number'
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
@@ -123,6 +124,32 @@ vim.opt.breakindent = true
 
 -- Save undo history
 vim.opt.undofile = true
+
+-- Session management - restore buffers on restart
+vim.opt.sessionoptions = 'buffers,curdir,folds,help,tabpages,winsize,winpos,terminal'
+vim.opt.shada = "'100,<50,s10,h,f1"
+
+-- Auto-save session on exit and restore on startup
+local session_group = vim.api.nvim_create_augroup('SessionManagement', { clear = true })
+
+vim.api.nvim_create_autocmd('VimLeavePre', {
+  group = session_group,
+  callback = function()
+    if vim.fn.argc() == 0 then -- Only save session if no files were specified on command line
+      vim.cmd('mksession! ~/.config/nvim/session.vim')
+    end
+  end,
+})
+
+vim.api.nvim_create_autocmd('VimEnter', {
+  group = session_group,
+  callback = function()
+    -- Only restore session if no arguments were passed and session file exists
+    if vim.fn.argc() == 0 and vim.fn.filereadable(vim.fn.expand('~/.config/nvim/session.vim')) == 1 then
+      vim.cmd('source ~/.config/nvim/session.vim')
+    end
+  end,
+})
 
 -- Case-insensitive searching UNLESS \C or one or more capital letters in the search term
 vim.opt.ignorecase = true
@@ -190,60 +217,6 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
--- Setup the statusline
--- Statusline configuration with rounded corners
-local function get_custom_statusline()
-  -- Helper function to create rounded separators
-  local function round_separator(color1, color2)
-    return '%#' .. color1 .. '#' .. '' .. '%#' .. color2 .. '#'
-  end
-
-  -- Define colors
-  vim.cmd [[
-    hi StatusLineAccent guibg=#1a1b26 guifg=#7aa2f7
-    hi StatusLineInsert guibg=#1a1b26 guifg=#9ece6a
-    hi StatusLineNormal guibg=#1a1b26 guifg=#7aa2f7
-    hi StatusLineVisual guibg=#1a1b26 guifg=#bb9af7
-    hi StatusLinePath guibg=#1a1b26 guifg=#737aa2
-    hi StatusLineModified guibg=#1a1b26 guifg=#e0af68
-  ]]
-
-  -- Get current mode
-  local mode_colors = {
-    n = 'StatusLineNormal',
-    i = 'StatusLineInsert',
-    v = 'StatusLineVisual',
-    V = 'StatusLineVisual',
-    [''] = 'StatusLineVisual',
-  }
-
-  local current_mode = vim.api.nvim_get_mode().mode
-  local mode_color = mode_colors[current_mode] or 'StatusLineNormal'
-
-  -- Build statusline components
-  local components = {
-    -- Left side
-    '%#'
-      .. mode_color
-      .. '#',
-    '  ',
-    vim.fn.mode(),
-    '  ',
-    round_separator(mode_color, 'StatusLinePath'),
-    ' %f', -- Filename
-    ' %m', -- Modified flag
-
-    -- Right side alignment
-    '%=',
-    '%#StatusLineAccent#',
-    ' %l:%c ', -- Line and column
-    round_separator('StatusLineAccent', 'StatusLineNormal'),
-    ' %p%% ', -- Percentage through file
-  }
-
-  return table.concat(components)
-end
-
 -- Set the statusline
 vim.opt.statusline = '%!v:lua.get_custom_statusline()'
 
@@ -254,8 +227,12 @@ vim.opt.laststatus = 2
 vim.opt.showmode = false
 
 -- Open the terminal with <leader> t
--- vim.keymap.set('n', '<leader>[', '<cmd>terminal<CR>', { desc = 'Open [T]erminal' })
+vim.keymap.set('n', '<leader>[', '<cmd>terminal<CR>', { desc = 'Open [T]erminal' })
 
+-- Custom Folding Options  
+vim.opt.foldmethod = 'expr' -- Use expression for folding
+vim.opt.foldexpr = 'nvim_treesitter#foldexpr()' -- Use treesitter for folding
+vim.opt.foldlevelstart = 99 -- Start with all folds open
 -- Optional: customize colors based on your colorscheme
 -- Replace these colors with ones that match your theme
 vim.cmd [[
@@ -315,110 +292,9 @@ require('lazy').setup({
   -- with the first argument being the link and the following
   -- keys can be used to configure plugin behavior/loading/etc.
   --
-  -- Use `opts = {}` to force a plugin to be loaded.
-  --
-
-  -- Here is a more advanced example where we pass configuration
-  -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
-  --    require('gitsigns').setup({ ... })
-  --
-  -- See `:help gitsigns` to understand what the configuration keys do
-  {
-    'lewis6991/gitsigns.nvim',
-    opts = {
-      signs = {
-        add = { text = '+' },
-        change = { text = '~' },
-        delete = { text = '_' },
-        topdelete = { text = '‾' },
-        changedelete = { text = '~' },
-      },
-      -- Add blame configuration
-      current_line_blame = true, -- Toggle current line blame
-      current_line_blame_opts = {
-        virt_text = true,
-        virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'
-        delay = 250, -- Delay in milliseconds before blame is shown
-        ignore_whitespace = false,
-      },
-      current_line_blame_formatter = ' | <author>, <author_time:%Y-%m-%d> - <summary>',
-    },
-  },
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
-  -- This is often very useful to both group configuration, as well as handle
-  -- lazy loading plugins that don't need to be loaded immediately at startup.
-  --
-  -- For example, in the following configuration, we use:
-  --  event = 'VimEnter'
-  --
-  -- which loads which-key before all the UI elements are loaded. Events can be
-  -- normal autocommands events (`:help autocmd-events`).
-  --
-  -- Then, because we use the `config` key, the configuration only runs
-  -- after the plugin has been loaded:
-  --  config = function() ... end
-
-  { -- Useful plugin to show you pending keybinds.
-    'folke/which-key.nvim',
-    event = 'VimEnter', -- Sets the loading event to 'VimEnter'
-    opts = {
-      icons = {
-        -- set icon mappings to true if you have a Nerd Font
-        mappings = vim.g.have_nerd_font,
-        -- If you are using a Nerd Font: set icons.keys to an empty table which will use the
-        -- default whick-key.nvim defined Nerd Font icons, otherwise define a string table
-        keys = vim.g.have_nerd_font and {} or {
-          Up = '<Up> ',
-          Down = '<Down> ',
-          Left = '<Left> ',
-          Right = '<Right> ',
-          C = '<C-…> ',
-          M = '<M-…> ',
-          D = '<D-…> ',
-          S = '<S-…> ',
-          CR = '<CR> ',
-          Esc = '<Esc> ',
-          ScrollWheelDown = '<ScrollWheelDown> ',
-          ScrollWheelUp = '<ScrollWheelUp> ',
-          NL = '<NL> ',
-          BS = '<BS> ',
-          Space = '<Space> ',
-          Tab = '<Tab> ',
-          F1 = '<F1>',
-          F2 = '<F2>',
-          F3 = '<F3>',
-          F4 = '<F4>',
-          F5 = '<F5>',
-          F6 = '<F6>',
-          F7 = '<F7>',
-          F8 = '<F8>',
-          F9 = '<F9>',
-          F10 = '<F10>',
-          F11 = '<F11>',
-          F12 = '<F12>',
-        },
-      },
-
-      -- Document existing key chains
-      spec = {
-        { '<leader>c', group = '[C]ode', mode = { 'n', 'x' } },
-        { '<leader>d', group = '[D]ocument' },
-        { '<leader>r', group = '[R]ename' },
-        { '<leader>s', group = '[S]earch' },
-        { '<leader>w', group = '[W]orkspace' },
-        { '<leader>t', group = '[T]oggle' },
-        { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
-      },
-    },
-  },
-  -- Github Copilot --
-  {
-    'github/copilot.vim',
-    event = 'VimEnter',
-  },
-
   -- Add this to your plugins table in the lazy.nvim setup:
   {
     'nvim-neo-tree/neo-tree.nvim',
@@ -754,7 +630,17 @@ require('lazy').setup({
             },
           },
         },
-        -- pyright = {},
+        pyright = {
+          settings = {
+            python = {
+              analysis = {
+                autoSearchPaths = true,
+                useLibraryCodeForTypes = true,
+                diagnosticMode = 'workspace',
+              },
+            },
+          },
+        },
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -1098,6 +984,7 @@ require('lazy').setup({
         additional_vim_regex_highlighting = { 'ruby' },
       },
       indent = { enable = true, disable = { 'ruby' } },
+      fold = { enable = true },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
